@@ -25,7 +25,7 @@ def RemoveWorkd( aWord ) :
 #defon = In a define state with a true condition.
 free, defoff, defon = range(3)
 
-#1st number is 2 for defined, 4 for !defined, bi
+#1st number is True for defined, False for !defined, bi
 ifdefA = [
 (True, "#[ \t]*if[ \t]*([0-9]+)"),
 (True, "#[ \t]*if[ \t]*defined\((.*)\)"),
