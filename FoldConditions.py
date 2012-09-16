@@ -5,19 +5,23 @@ Defines = []
 ConditionKeys = "^#(if|else|elif|endif)"
 MaxStack = 100
 
-def Defined( aWord ) :
-  if aWord.isalnum() :
-    return (aWord != "0")
+def Defined( aWord, TestDigit = True ) :
+  if aWord.isdigit() :
+    #TestDigit false means we don't consider digits so we always return True.
+    return True if not TestDigit else (aWord != "0")
   return aWord in Defines
 
 def AddWord( aWord ) :
-  if not Defined(aWord) :
+  global Defines
+  #Don't ever add digits.
+  if not Defined(aWord, False) :
     Defines.append(aWord)
-    # print Defines
+#    print Defines
 
-def RemoveWorkd( aWord ) :
+def RemoveWord( aWord ) :
+  global Defines
   Defines.remove(aWord)
-  # print Defines
+#  print Defines
 
 #Create enum for define parsing state.
 #free = not currently in a define state.
