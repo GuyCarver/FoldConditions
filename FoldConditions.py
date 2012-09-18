@@ -32,9 +32,9 @@ free, defoff, defon = range(3)
 #1st number is True for defined, False for !defined, bi
 ifdefA = [
 (True, "#[ \t]*if[ \t]*([0-9]+)"),
-(True, "#[ \t]*if[ \t]*defined\((.*)\)"),
+(True, "#[ \t]*if[ \t]*defined[ \t]*\((.*)\)"),
 (True, "#[ \t]*ifdef[ \t]*(.*)"),
-(False, "#[ \t]*if[ \t]*!defined\((.*)\)"),
+(False, "#[ \t]*if[ \t]*!defined[ \t]*\((.*)\)"),
 (False, "#[ \t]*ifndef[ \t]*(.*)")
 ]
 
