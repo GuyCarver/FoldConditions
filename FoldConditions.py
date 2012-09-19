@@ -31,17 +31,20 @@ free, defoff, defon = range(3)
 
 #1st number is True for defined, False for !defined, bi
 ifdefA = [
-(True, "#[ \t]*if[ \t]*([0-9]+)"),
-(True, "#[ \t]*if[ \t]*defined[ \t]*\((.*)\)"),
-(True, "#[ \t]*ifdef[ \t]*(.*)"),
-(False, "#[ \t]*if[ \t]*!defined[ \t]*\((.*)\)"),
-(False, "#[ \t]*ifndef[ \t]*(.*)")
+(True, re.compile("#[ \t]*if[ \t]*([0-9]+)")),
+(True, re.compile("#[ \t]*if[ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)")),
+(True, re.compile("#[ \t]*ifdef[ \t]*([a-zA-Z0-9]+)")),
+(False, re.compile("#[ \t]*if[ \t]*!defined[ \t]*\(([a-zA-Z0-9]+)\)")),
+(False, re.compile("#[ \t]*ifndef[ \t]*([a-zA-Z0-9]+)"))
 ]
 
 elifA = [
-(True, "#[ \t]*elif[ \t]*defined\((.*)\)"),
-(False, "#[ \t]*elif[ \t]*!defined\((.*)\)"),
+(True, re.compile("#[ \t]*elif[ \t]*defined\((.*)\)")),
+(False, re.compile("#[ \t]*elif[ \t]*!defined\((.*)\)")),
 ]
+
+elsesearch = re.compile("#[ \t]*else.*")
+endifsearch = re.compile("#[ \t]*endif.*")
 
 class DefineCommand( sublime_plugin.TextCommand ) :
   def run( self, edit, cmd = "add" ) :
@@ -65,7 +68,7 @@ class DefineRemoveSelCommand( sublime_plugin.WindowCommand ) :
 def IfDef( aLine ) :
   ###Return (T/F = found result, free|defon|defoff)
   for srch in ifdefA :
-    res =  re.search(srch[1], aLine)
+    res =  srch[1].search(aLine)
     if res :
       defd = srch[0] if Defined(res.group(1)) else not srch[0]
       # print "def: %s = %s" % (aLine, defd)
@@ -73,7 +76,7 @@ def IfDef( aLine ) :
   return (False, free)
 
 def Else( aLine ) :
-  res = re.search("#[ \t]*else", aLine)
+  res = elsesearch.search(aLine)
   # if res :
     # print "else: %s" % aLine
   return res != None
@@ -81,7 +84,7 @@ def Else( aLine ) :
 def ElIf( aLine ) :
   ###Return (T/F = found result, free|defon|defoff)
   for srch in elifA :
-    res =  re.search(srch[1], aLine)
+    res =  srch[1].search(aLine)
     if res :
       defd = srch[0] if Defined(res.group(1)) else not srch[0]
       # print "elif: %s = %s" % (aLine, defd)
@@ -89,7 +92,7 @@ def ElIf( aLine ) :
   return (False, free)
 
 def EndIf( aLine ) :
-  res = re.search("#[ \t]*endif", aLine)
+  res = endifsearch.search(aLine)
   # if res :
     # print "endif: %s" % aLine
   return res != None
@@ -130,6 +133,7 @@ class FoldConditionsCommand( sublime_plugin.TextCommand ) :
     prevState = free if len(self.stack) == 0 else self.stack[-1]
     if ShouldFold(prevState, state) :
       self.AddRegion(aLine, state)
+    return state
 
   def FindRegions( self ) :
     vw = self.view
@@ -143,11 +147,12 @@ class FoldConditionsCommand( sublime_plugin.TextCommand ) :
         self.Push(state, ln)
       elif Else(txt) :
         #if else then swap the stack entry state
-        self.Pop(ln)
-        self.Push(state, ln)
+        state = self.Pop(ln)
+        print "else: %d" % state
+        self.Push(defon if state == defoff else defoff, ln)
       elif EndIf(txt) :
         #if endif then pop the stack entry.
-        self.Pop(ln)
+        state = self.Pop(ln)
       else:
         defd, state = ElIf(txt)
         if defd :
