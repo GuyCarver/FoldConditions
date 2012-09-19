@@ -2,7 +2,7 @@ import sublime, sublime_plugin
 import collections, re
 
 Defines = []
-ConditionKeys = "^#(if|else|elif|endif)"
+ConditionKeys = "^#[.\t]*(if|else|elif|endif)"
 MaxStack = 100
 
 def Defined( aWord, TestDigit = True ) :
@@ -20,8 +20,11 @@ def AddWord( aWord ) :
 
 def RemoveWord( aWord ) :
   global Defines
-  Defines.remove(aWord)
-#  print Defines
+  try:
+    Defines.remove(aWord)
+    # print Defines
+  except:
+    pass
 
 #Create enum for define parsing state.
 #free = not currently in a define state.
@@ -55,6 +58,9 @@ class DefineCommand( sublime_plugin.TextCommand ) :
       word = vw.word(s.a)
       wordstr = vw.substr(word)
       runcmd(wordstr)
+
+    # when adding/removing a define run the fold.
+    vw.run_command("fold_conditions")
 
 class DefineRemoveSelCommand( sublime_plugin.WindowCommand ) :
   def run( self ) :
@@ -137,6 +143,7 @@ class FoldConditionsCommand( sublime_plugin.TextCommand ) :
 
   def FindRegions( self ) :
     vw = self.view
+    #Find all of the lines we need to process.
     conditionRegs = vw.find_all(ConditionKeys)
     for r in conditionRegs :
       ln = vw.line(r)
@@ -157,8 +164,10 @@ class FoldConditionsCommand( sublime_plugin.TextCommand ) :
         defd, state = ElIf(txt)
         if defd :
           #if elif then pop the stack entry and make a new one.
-          self.Pop(ln)
-          self.Push(state, ln)
+          prevState = self.Pop(ln)
+          #Only use the new state if the previous state was false
+          # otherwise this state should be off.
+          self.Push(defoff if prevState == defon else state, ln)
 
   def reset( self ) :
     self.startPoint = 0
