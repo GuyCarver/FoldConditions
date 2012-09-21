@@ -16,7 +16,7 @@ def AddWord( aWord ) :
   #Don't ever add digits.
   if not Defined(aWord, False) :
     Defines.append(aWord)
-#    print Defines
+    # print Defines
 
 def RemoveWord( aWord ) :
   global Defines
@@ -32,10 +32,25 @@ def RemoveWord( aWord ) :
 #defon = In a define state with a true condition.
 free, defoff, defon = range(3)
 
+def OpOr( aValue1, aValue2 ) :
+  # print "%d or %d" % (aValue1, aValue2)
+  return aValue1 or aValue2
+
+def OpAnd( aValue1, aValue2 ) :
+  # print "%d and %d" % (aValue1, aValue2)
+  return aValue1 and aValue2
+
+moredefA = [
+(True, re.compile("[ \t]*\|\|[ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)(.*)"), OpOr),
+(False, re.compile("[ \t]*\|\|[ \t]*![ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)(.*)"), OpOr),
+(True, re.compile("[ \t]*&&[ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)(.*)"), OpAnd),
+(False, re.compile("[ \t]*&&[ \t]*![ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)(.*)"), OpAnd)
+]
+
 #1st number is True for defined, False for !defined, bi
 ifdefA = [
 (True, re.compile("#[ \t]*if[ \t]*([0-9]+)")),
-(True, re.compile("#[ \t]*if[ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)")),
+(True, re.compile("#[ \t]*if[ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)(.*)")),
 (True, re.compile("#[ \t]*ifdef[ \t]*([a-zA-Z0-9]+)")),
 (False, re.compile("#[ \t]*if[ \t]*!defined[ \t]*\(([a-zA-Z0-9]+)\)")),
 (False, re.compile("#[ \t]*ifndef[ \t]*([a-zA-Z0-9]+)"))
@@ -71,12 +86,31 @@ class DefineRemoveSelCommand( sublime_plugin.WindowCommand ) :
     if aArg != -1 :
       Defines.remove(Defines[aArg])
 
+def CheckMore( aValue, aLine ) :
+  if aLine == "" :
+    return aValue
+
+  # print "Checking more %s" % aLine
+  for srch in moredefA :
+    res = srch[1].search(aLine)
+    if res and res.lastindex :
+      # print "Matched %s checkmore %d" % (res.group(1), res.lastindex)
+      defd = srch[0] if Defined(res.group(1)) else not srch[0]
+      if res.lastindex == 2 :
+        CheckMore(defd, res.group(2))
+      aValue = srch[2](aValue, defd)
+
+  return aValue
+
 def IfDef( aLine ) :
   ###Return (T/F = found result, free|defon|defoff)
   for srch in ifdefA :
     res =  srch[1].search(aLine)
-    if res :
+    if res and res.lastindex :
       defd = srch[0] if Defined(res.group(1)) else not srch[0]
+      # print "%s last index %d" % (res.group(1), res.lastindex)
+      if res.lastindex == 2 :
+        defd = CheckMore(defd, res.group(2))
       # print "def: %s = %s" % (aLine, defd)
       return(True, defon if defd else defoff)
   return (False, free)
@@ -155,7 +189,7 @@ class FoldConditionsCommand( sublime_plugin.TextCommand ) :
       elif Else(txt) :
         #if else then swap the stack entry state
         state = self.Pop(ln)
-        print "else: %d" % state
+        # print "else: %d" % state
         self.Push(defon if state == defoff else defoff, ln)
       elif EndIf(txt) :
         #if endif then pop the stack entry.

@@ -16,5 +16,8 @@ This package allows you to set a number of values as defined then fold the sourc
 * ctrl+k, ctrl+u = List defines and remove selected
 * ctrl+k, ctrl+d = Fold file.
 
+#### Known Issues:
+* The last condition in a file does not always get expanded correctly.
+
 #### TODO:
-* if defined() &&/|| defined() etc.. not yet supported
+* Nothing on the slate at the moment.
