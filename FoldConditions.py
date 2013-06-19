@@ -16,13 +16,13 @@ def AddWord( aWord ) :
   #Don't ever add digits.
   if not Defined(aWord, False) :
     Defines.append(aWord)
-    # print Defines
+    # print(Defines)
 
 def RemoveWord( aWord ) :
   global Defines
   try:
     Defines.remove(aWord)
-    # print Defines
+    # print(Defines)
   except:
     pass
 
@@ -33,11 +33,11 @@ def RemoveWord( aWord ) :
 free, defoff, defon = range(3)
 
 def OpOr( aValue1, aValue2 ) :
-  # print "%d or %d" % (aValue1, aValue2)
+  # print("{} or {}".format(aValue1, aValue2))
   return aValue1 or aValue2
 
 def OpAnd( aValue1, aValue2 ) :
-  # print "%d and %d" % (aValue1, aValue2)
+  # print("{} and {}".format(aValue1, aValue2))
   return aValue1 and aValue2
 
 moredefA = [
@@ -90,11 +90,11 @@ def CheckMore( aValue, aLine ) :
   if aLine == "" :
     return aValue
 
-  # print "Checking more %s" % aLine
+  # print("Checking more " + aLine)
   for srch in moredefA :
     res = srch[1].search(aLine)
     if res and res.lastindex :
-      # print "Matched %s checkmore %d" % (res.group(1), res.lastindex)
+      # print("Matched {} checkmore {}".format(res.group(1), res.lastindex))
       defd = srch[0] if Defined(res.group(1)) else not srch[0]
       if res.lastindex == 2 :
         CheckMore(defd, res.group(2))
@@ -108,17 +108,17 @@ def IfDef( aLine ) :
     res =  srch[1].search(aLine)
     if res and res.lastindex :
       defd = srch[0] if Defined(res.group(1)) else not srch[0]
-      # print "%s last index %d" % (res.group(1), res.lastindex)
+      # print("{} last index {}".format(res.group(1), res.lastindex))
       if res.lastindex == 2 :
         defd = CheckMore(defd, res.group(2))
-      # print "def: %s = %s" % (aLine, defd)
+      # print("def: {} = {}".format(aLine, defd))
       return(True, defon if defd else defoff)
   return (False, free)
 
 def Else( aLine ) :
   res = elsesearch.search(aLine)
   # if res :
-    # print "else: %s" % aLine
+    # print("else: " + aLine)
   return res != None
 
 def ElIf( aLine ) :
@@ -127,14 +127,14 @@ def ElIf( aLine ) :
     res =  srch[1].search(aLine)
     if res :
       defd = srch[0] if Defined(res.group(1)) else not srch[0]
-      # print "elif: %s = %s" % (aLine, defd)
+      # print("elif: {} = {}".format(aLine, defd))
       return(True, defon if defd else defoff)
   return (False, free)
 
 def EndIf( aLine ) :
   res = endifsearch.search(aLine)
   # if res :
-    # print "endif: %s" % aLine
+    # print("endif: " + aLine)
   return res != None
 
 def ShouldFold( state1, state2 ) :
@@ -154,12 +154,12 @@ class FoldConditionsCommand( sublime_plugin.TextCommand ) :
     rc2 = self.view.rowcol(reg.b)
     if aState != defoff:
       self.expand.append(reg)
-      # print "expand: %s - %s" % (rc1, rc2)
+      # print("expand: {} - {}".format(rc1, rc2))
     else:
       self.fold.append(reg)
-      # print "fold: %s - %s" % (rc1, rc2)
+      # print("fold: {} - {}".format(rc1, rc2))
 
-    # print "State: %d" % aState
+    # print("State: " + str(aState))
     self.startPoint = line.b
 
   def Push( self, aState, aLine ) :
@@ -189,7 +189,7 @@ class FoldConditionsCommand( sublime_plugin.TextCommand ) :
       elif Else(txt) :
         #if else then swap the stack entry state
         state = self.Pop(ln)
-        # print "else: %d" % state
+        # print("else: " + str(state))
         self.Push(defon if state == defoff else defoff, ln)
       elif EndIf(txt) :
         #if endif then pop the stack entry.

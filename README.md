@@ -1,4 +1,4 @@
-# Sublime Text 2 FoldConditions Package adding code folding for C/C++ conditinoal compile directives.
+# Sublime Text FoldConditions Package adding code folding for C/C++ conditinoal compile directives.
 
 ## Install
 
