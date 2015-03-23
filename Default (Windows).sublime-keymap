@@ -1,6 +1,7 @@
 [
 	{ "keys": ["ctrl+k", "d"], "command": "define" },
-	{ "keys": ["ctrl+k", "ctrl+u"], "command": "define", "args": {"cmd": "remove"} },
+	{ "keys": ["ctrl+k", "n"], "command": "define", "args": {"cmd": "remove"} },
 	{ "keys": ["ctrl+k", "l"], "command": "define_remove_sel" },
+	{ "keys": ["ctrl+k", "D"], "command": "matching_condition" },
 	{ "keys": ["ctrl+k", "ctrl+d"], "command": "fold_conditions" }
 ]

@@ -4,45 +4,52 @@ import collections, re, functools
 Defines = []
 MaxStack = 100
 
-def dbgprint ( *aArgs ) :
+#def dbgprint ( *aArgs ) :
 #  print(*aArgs)
-  pass
 
 def Defined( aWord, TestDigit = True ) :
+  '''Determine if the given word is in our define list.  If it's a non-0
+    numbers return true.'''
   if aWord.isdigit() :
     #TestDigit false means we don't consider digits so we always return True.
     return True if not TestDigit else (aWord != "0")
   return aWord in Defines
 
 def AddWord( aWord ) :
+  '''Add a word if it is not defined.'''
   global Defines
   #Don't ever add digits.
-  if not Defined(aWord, False) :
+  res =  not Defined(aWord, False)
+  if res :
     Defines.append(aWord)
 #    dbgprint(Defines)
+  return res
 
 def ToggleWord( aWord ) :
+  '''If word is in the def list remove, otherwise add.'''
   global Defines
   if Defined(aWord, False) :
     try:
       Defines.remove(aWord)
     except:
-      pass
+      return False
   else:
     Defines.append(aWord)
+  return True
 
 def RemoveWord( aWord ) :
+  '''Remove given word from the def list.'''
   global Defines
   try:
     Defines.remove(aWord)
 #    dbgprint(Defines)
+    return True
   except:
-    pass
+    return False
 
-#Create enum for define parsing state.
-#free = not currently in a define state.
-#defoff = In a define state with a false condition.
+#Create enum for define parsing condition
 #defon = In a define state with a true condition.
+#defoff = In a define state with a false condition.
 defon, defoff = range(2)
 
 def OpOr( aValue1, aValue2 ) :
@@ -53,22 +60,23 @@ def OpAnd( aValue1, aValue2 ) :
   # print("{} and {}".format(aValue1, aValue2))
   return aValue1 and aValue2
 
+#List of conditions for multiple defined() checks on a single line.
+#1st number is True for defined, False for !defined.
 moredefA = [
-(True, re.compile("[ \t]*\|\|[ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)(.*)"), OpOr),
-(False, re.compile("[ \t]*\|\|[ \t]*![ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)(.*)"), OpOr),
-(True, re.compile("[ \t]*&&[ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)(.*)"), OpAnd),
-(False, re.compile("[ \t]*&&[ \t]*![ \t]*defined[ \t]*\(([a-zA-Z0-9]+)\)(.*)"), OpAnd),
+(True, re.compile("[ \t]*\|\|[ \t]*defined[ \t]*\((\w+)\)(.*)"), OpOr),
+(False, re.compile("[ \t]*\|\|[ \t]*![ \t]*defined[ \t]*\((\w+)\)(.*)"), OpOr),
+(True, re.compile("[ \t]*&&[ \t]*defined[ \t]*\((\w+)\)(.*)"), OpAnd),
+(False, re.compile("[ \t]*&&[ \t]*![ \t]*defined[ \t]*\((\w+)\)(.*)"), OpAnd),
 ]
 
-#1st number is True for defined, False for !defined, bi
+#List of #if expressions.
 ifdefA = [
-(True, re.compile("#[ \t]*if[ \t]*defined[ \t]*\(([_a-zA-Z0-9]+)\)(.*)")),
-(True, re.compile("#[ \t]*ifdef[ \t]*([_a-zA-Z0-9]+)")),
-(False, re.compile("#[ \t]*if[ \t]*!defined[ \t]*\(([_a-zA-Z0-9]+)\)")),
-(False, re.compile("#[ \t]*ifndef[ \t]*([_a-zA-Z0-9]+)")),
-(True, re.compile("#[ \t]*if[ \t]*([\(\)0-9a-zA-Z_]+)"))
+(True, re.compile("#[ \t]*if(?P<df>def)?[ \t]*(?(df)|(defined))[ \t]*\(?(\w+)\)?(.*)")),
+(False, re.compile("#[ \t]*if(?P<df>ndef)?[ \t]*(?(df)|(!defined))[ \t]*\(?(\w+)\)?(.*)")),
+(True, re.compile("#[ \t]*if[ \t]*([\(\)\w]+)"))
 ]
 
+#list of elif expressions
 elifA = [
 (True, re.compile("#[ \t]*elif[ \t]*defined\((.*)\)")),
 (False, re.compile("#[ \t]*elif[ \t]*!defined\((.*)\)")),
@@ -78,26 +86,31 @@ elsesearch = re.compile("#[ \t]*else.*")
 endifsearch = re.compile("#[ \t]*endif.*")
 
 class DefineCommand( sublime_plugin.TextCommand ) :
+  '''Grab word under selections do the desired action on the def list.'''
   def run( self, edit, cmd = "toggle" ) :
     vw = self.view
 #    dbgprint("running")
-    if cmd == 'add' :
+    if cmd == 'add' :       #Make sure word is in the define list.
       runcmd = AddWord
-    elif cmd == 'toggle' :
+    elif cmd == 'toggle' :  #If word in list remove else add.
       runcmd = ToggleWord
-    else:
+    else:                   #make sure word is not in define list.
       runcmd = RemoveWord
+
+    change = False
 
     for s in vw.sel() :
       #Get word under selection and add to list.
       word = vw.word(s.a)
       wordstr = vw.substr(word)
-      runcmd(wordstr)
+      change |= runcmd(wordstr)
 
-    # when adding/removing a define run the fold.
-    vw.run_command("fold_conditions")
+    #Redo the fold conditions.
+    if change :
+      vw.run_command("fold_conditions")
 
 class DefineRemoveSelCommand( sublime_plugin.TextCommand ) :
+  '''Show list of defined words and remove picked word.'''
   def run( self, edit ) :
     if len(Defines) :
       self.view.window().show_quick_panel(Defines, self.ondone)
@@ -108,6 +121,7 @@ class DefineRemoveSelCommand( sublime_plugin.TextCommand ) :
       self.view.run_command("fold_conditions")
 
 def CheckMore( aValue, aLine ) :
+  '''Check to see if more expressions exist on the line.'''
   if aLine == "" :
     return aValue
 
@@ -123,16 +137,18 @@ def CheckMore( aValue, aLine ) :
 
   return aValue
 
-NodeStack = None #Stack of state, Eval, Sibling, Child
+NodeStack = None #Stack of state, Range, Eval, Sibling, Child
 view = None
 
 def PushChild( aState, aRange, aEval ) :
+  '''Push data onto the child list of the top state in the stack'''
   global NodeStack
   node = (aState, aRange, aEval, [], [])
   NodeStack[0][4].insert(0, node)
   NodeStack.insert(0, node)
 
 def Pop( ) :
+  '''Pop state from the top of the stack.'''
   global NodeStack
   if len(NodeStack) > 1 :
     NodeStack.pop(0)
@@ -140,6 +156,7 @@ def Pop( ) :
   return False
 
 def PushSibling( aState, aRange, aEval, aPush = True ) :
+  '''Push data onto the sibling list of the top state in the stack'''
   global NodeStack
   node = (aState, aRange, aEval, [], [])
   NodeStack[0][3].insert(0, node)
@@ -149,39 +166,46 @@ def PushSibling( aState, aRange, aEval, aPush = True ) :
   return res
 
 def EvalFree( aRange, aHidden ) :
-  dbgprint("open")
+  '''Evaluation function for open state (not in a condition yet)'''
+#  dbgprint("open")
   return 0
 
 def EvalIf( OnOff, aRes, aRange, aHidden ) :
-  defd = OnOff if Defined(aRes.group(1)) else not OnOff
+  '''Evaluation function for an if expression.'''
+#  dbgprint(aRes.groups())
+  defd = OnOff if Defined(aRes.group(3)) else not OnOff
 #  dbgprint("{} last index {}".format(res.group(1), res.lastindex))
-  if aRes.lastindex == 2 :
-    defd = CheckMore(defd, aRes.group(2))
-  dbgprint(aRange, aRes.group(0), defd)
+  if aRes.lastindex == 4 :
+    defd = CheckMore(defd, aRes.group(4))
+#  dbgprint(aRange, aRes.group(0), defd)
   return int(not defd)
 
 def EvalElIf( OnOff, aRes, aRange, aHidden ) :
+  '''Evaluation function for an elif expression.'''
   res = (aHidden ^ 1) << 1
   if not res:
     defd = OnOff if Defined(aRes.group(1)) else not OnOff
     res = int(not defd)
-  dbgprint(aRange, aRes.group(0), res)
+#  dbgprint(aRange, aRes.group(0), res)
   return res
 
 def EvalElse( aRange, aHidden ) :
+  '''Evaluation function for an else expression.'''
   ln = view.line(aRange)
   line = view.substr(ln)
-  dbgprint(aRange, line, aHidden)
+#  dbgprint(aRange, line, aHidden)
   return aHidden ^ 1
 
 def EvalEndIf( aRange, aHidden ) :
+  '''Evaluation function for an endif expression.'''
   aHidden = 0
   ln = view.line(aRange)
   line = view.substr(ln)
-  dbgprint(aRange, line, aHidden)
+#  dbgprint(aRange, line, aHidden)
   return aHidden
 
 def IfDef( aRange, aLine ) :
+  '''Determine if line is an #if expression.'''
   for srch in ifdefA :
     res = srch[1].search(aLine)
     if res and res.lastindex :
@@ -190,6 +214,7 @@ def IfDef( aRange, aLine ) :
   return False
 
 def ElIf( aRange, aLine ) :
+  '''Determine if line is an #elif expression.'''
   for srch in elifA :
     res =  srch[1].search(aLine)
     if res :
@@ -197,18 +222,21 @@ def ElIf( aRange, aLine ) :
     return False
 
 def Else( aRange, aLine ) :
+  '''Determine if line is an #else expression.'''
   res = elsesearch.search(aLine)
   if res != None :
     return PushSibling(elsestate, aRange, EvalElse)
   return False
 
 def EndIf( aRange, aLine ) :
+  '''Determine if line is an #endif expression.'''
   res = endifsearch.search(aLine)
   if res != None :
     return PushSibling(freestate, aRange, EvalEndIf, False)
   return False
 
 def freestate( aRange, aLine ) :
+  '''Process a line while in a free (non-condition) state.'''
   res = None
   if not IfDef(aRange, aLine) :
     if (Else(aRange, aLine)) or (ElIf(aRange, aLine)) or (EndIf(aRange, aLine)):
@@ -216,13 +244,14 @@ def freestate( aRange, aLine ) :
   return res
 
 def ifstate( aRange, aLine ) :
+  '''Process a line while in an if condition.'''
   if not IfDef(aRange, aLine):
-    if not Else(aRange, aLine):
-      if not ElIf(aRange, aLine):
-        EndIf(aRange, aLine)
+    if (not Else(aRange, aLine)) and (not ElIf(aRange, aLine)):
+      EndIf(aRange, aLine)
   return None
 
 def elsestate( aRange, aLine ) :
+  '''Process a line while in an else condition.  Else conditions are not allowed now.'''
   if not IfDef(aRange, aLine):
       if not ElIf(aRange, aLine):
         if not EndIf(aRange, aLine):
@@ -230,64 +259,92 @@ def elsestate( aRange, aLine ) :
             return "Nested Else"
   return None
 
+def FillNodeStack( aView ) :
+  global NodeStack
+  global view
+
+  view = aView
+
+  #Start in a free state with no region.
+  NodeStack = [(freestate, None, EvalFree, [], [])] #Stack of state, Region, Eval, Sibling, Child
+
+  #Find #ifdef, #endif.
+  conditionRegs = aView.find_by_selector("preprocessor.keyword.control.import.c")
+  #Fend #else, #elif
+  conditionRegs = conditionRegs + aView.find_by_selector("preprocessor.import.control.keyword.c")
+  #Sort all the entries by location.
+  conditionRegs = sorted(conditionRegs, key = lambda r: r.begin())
+
+  for r in conditionRegs:
+    ln = aView.line(r)
+    line = aView.substr(ln)
+#      dbgprint(aView.rowcol(ln.begin()), line)
+    #Run the line through the top state on the stack.
+    err = NodeStack[0][0](ln, line)
+    #if err is set then we ran into an error so show it to the user.
+    if err :
+      row, _ = aView.rowcol(ln.begin())
+      msg = "{} line {} - {}".format(err, row + 1, line)
+#        dbgprint(msg)
+      aView.show_at_center(ln)
+      aView.sel().clear()
+      aView.sel().add(ln)
+      sublime.error_message(msg)
+      break
+
+  if len(NodeStack) > 1 :
+    for s in NodeStack[:-1] :
+      ln = aView.line(s[1])
+      row, _ = aView.rowcol(ln.begin())
+      line = aView.substr(ln)
+      print("Unclosed condition", row + 1, line)
+    return False
+
+  return True
+
 class FoldConditionsCommand( sublime_plugin.TextCommand ) :
   def __init__( self, edit ) :
     super(FoldConditionsCommand, self).__init__(edit)
     self.reset()
 
-  def AddFold( self, aRegion ) :
+  def StopFolding( self, aRegion ) :
+    '''Add a fold region and go into an expanded state.'''
     r = sublime.Region(self.startPoint, max(aRegion.begin() - 1, 0))
     self.fold.append(r)
-    dbgprint("fold", r)
+#    dbgprint("fold", r)
     self.startPoint = aRegion.end() + 1
     self.Folding = False
 
-  def AddExpand( self, aRegion ) :
-    dbgprint("expand", aRegion)
+  def StartFolding( self, aRegion ) :
+    '''Stop expanded state and start a folding region.'''
+#    dbgprint("expand", aRegion)
     self.startPoint = aRegion.end() + 1
     self.Folding = True
 
-  def crawl( self, aState, aHidden ):
+  def crawl( self, aState, aHidden ) :
+    '''Recursively run through the state trees and process the regions.'''
+
+    #run the state evaluation function with the region and current Hidden state.
     aHidden = aState[2](aState[1], aHidden)
 #    dbgprint(aHidden)
 
+    #if the state is active then run the children
     if not aHidden :
+      #If folding stop it as we are now in an open state.
       if self.Folding :
-        self.AddFold(aState[1])
+        self.StopFolding(aState[1])
 
+      #process the children because they will be visible.
       for child in aState[4]:
         self.crawl(child, aHidden)
     else:
+      #if not folding start folding.
       if not self.Folding:
-        self.AddExpand(aState[1])
+        self.StartFolding(aState[1])
 
+    #Process the siblings.
     for sibling in aState[3]:
       aHidden = self.crawl(sibling, aHidden)
-
-  def FindRegions( self ) :
-    global view
-    global NodeStack
-    view = self.view
-    NodeStack = [(freestate, None, EvalFree, [], [])] #Stack of state, Region, Eval, Sibling, Child
-
-    conditionRegs = view.find_by_selector("preprocessor.keyword.control.import.c")
-    conditionRegs = conditionRegs + view.find_by_selector("preprocessor.import.control.keyword.c")
-    conditionRegs = sorted(conditionRegs, key = lambda r: r.begin())
-
-    for r in conditionRegs:
-      ln = view.line(r)
-      line = view.substr(ln)
-#      dbgprint(view.rowcol(ln.begin()), line)
-      res = NodeStack[0][0](ln, line)
-      if res :
-        row, _ = view.rowcol(ln.begin())
-        msg = "{} line {} - {}".format(res, row + 1, line)
-        dbgprint(msg)
-        view.show_at_center(ln)
-        view.sel().clear()
-        view.sel().add(ln)
-        sublime.error_message(msg)
-        return
 
   def reset( self ) :
     global NodeStack
@@ -299,19 +356,43 @@ class FoldConditionsCommand( sublime_plugin.TextCommand ) :
     view = None
 
   def run( self, edit ) :
-    vw = self.view
-    self.reset()
-    vw.run_command("unfold_all")
-    self.FindRegions()
 
-    if (len(NodeStack) > 1):
-      for s in NodeStack[:-1] :
-        ln = vw.line(s[1])
-        row, _ = vw.rowcol(ln.begin())
-        line = vw.substr(ln)
-        print("Unclosed condition", row + 1, line)
-    else:
+    self.view.run_command("unfold_all")
+
+    if FillNodeStack(self.view) :
       self.crawl(NodeStack[0], 0)
+      self.view.fold(self.fold)
 
-    vw.fold(self.fold)
     self.reset()
+
+class MatchingConditionCommand( sublime_plugin.TextCommand ) :
+  def __init__( self, edit ) :
+    super(MatchingConditionCommand, self).__init__(edit)
+    self.reset()
+
+  def reset( self ) :
+    global NodeStack
+    global view
+    NodeStack = None
+    view = None
+
+  def run( self, edit ) :
+    vw = self.view
+
+    #todo: Check current line for correct type.
+    ln = vw.line(vw.sel()[0])
+    c1 = "preprocessor.keyword.control.import.c"
+    c2 = "preprocessor.import.control.keyword.c"
+    score = vw.score_selector(ln.begin(), c1)
+    score |= vw.score_selector(ln.begin(), c2)
+#    line = vw.substr(ln)
+#    dbgprint(line, "is", score)
+
+    if score :
+      if FillNodeStack(self.vw) :
+        #todo: run
+        pass
+
+      self.reset()
+
+
