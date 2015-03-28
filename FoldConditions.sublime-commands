@@ -2,5 +2,7 @@
 	{ "command": "define", "caption": "Define: Set" },
 	{ "command": "define", "args": {"cmd": "remove"}, "caption": "Define: Remove" },
 	{ "command": "define_remove_sel", "caption": "Define: RemoveSel" },
+	{ "command": "matching_condition"], "caption": "Matching Condition" },
 	{ "command": "fold_conditions", "caption": "Define: Fold" }
+
 ]
