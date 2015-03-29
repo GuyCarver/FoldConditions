@@ -407,6 +407,13 @@ class FoldConditionsCommand( sublime_plugin.TextCommand ) :
 
     self.reset()
 
+defselectors = [
+  "preprocessor.keyword.control.import.c",
+  "preprocessor.keyword.control.import.if.c",
+  "preprocessor.keyword.control.import.else.c",
+  "preprocessor.import.control.keyword.c"
+]
+
 class MatchingConditionCommand( sublime_plugin.TextCommand ) :
   def __init__( self, edit ) :
     super(MatchingConditionCommand, self).__init__(edit)
@@ -445,18 +452,19 @@ class MatchingConditionCommand( sublime_plugin.TextCommand ) :
   def run( self, edit ) :
     vw = self.view
 
-    #todo: Check current line for correct type.
     s = vw.sel()[0]
     ln = vw.line(s)
     #note: This will match pragmas as well but I don't worry about that.
-    c1 = "preprocessor.keyword.control.import.if.c"
-    c2 = "preprocessor.import.control.keyword.c"
-    score = vw.score_selector(ln.begin(), c1)
-    score |= vw.score_selector(ln.begin(), c2)
+    score = 0
+    for d in defselectors :
+      score |= vw.score_selector(ln.begin(), d)
+      if score : break
+
     #If beginning of line doesn't match score try cursor position.
     if not score :
-      score = vw.score_selector(s.a, c1)
-      score |= vw.score_selector(s.a, c2)
+      for d in defselectors :
+        score |= vw.score_selector(s.a, d)
+        if score : break
 
 #    line = vw.substr(ln)
 #    dbgprint(line, "is", score)
@@ -472,5 +480,4 @@ class MatchingConditionCommand( sublime_plugin.TextCommand ) :
           vw.sel().add(sublime.Region(p, p))
 
       self.reset()
-
 
