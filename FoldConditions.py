@@ -455,15 +455,15 @@ class MatchingConditionCommand( sublime_plugin.TextCommand ) :
     s = vw.sel()[0]
     ln = vw.line(s)
     #note: This will match pragmas as well but I don't worry about that.
-    score = 0
+    score = False
     for d in defselectors :
-      score |= vw.score_selector(ln.begin(), d)
+      score |= vw.match_selector(ln.begin(), d)
       if score : break
 
     #If beginning of line doesn't match score try cursor position.
     if not score :
       for d in defselectors :
-        score |= vw.score_selector(s.a, d)
+        score |= vw.match_selector(s.a, d)
         if score : break
 
 #    line = vw.substr(ln)

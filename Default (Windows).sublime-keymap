@@ -3,6 +3,10 @@
 	{ "keys": ["ctrl+k", "D"], "command": "fold_set_region" },
 	{ "keys": ["ctrl+k", "n"], "command": "define", "args": {"cmd": "remove"} },
 	{ "keys": ["ctrl+k", "l"], "command": "define_remove_sel" },
-	{ "keys": ["ctrl+k", "m"], "command": "matching_condition" },
+	{ "keys": ["ctrl+m"], "command": "matching_condition", "context":
+		[
+			{ "key": "selector", "operator": "equal", "operand": "meta.preprocessor.c" }
+		]
+	 },
 	{ "keys": ["ctrl+k", "ctrl+d"], "command": "fold_conditions" }
 ]
